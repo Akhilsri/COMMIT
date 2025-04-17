@@ -16,6 +16,7 @@ Commit is a mobile application designed to help individuals overcome porn addict
 - **Gemini AI**: AI-powered challenge generation and behavior analysis.
 
 ![Commit Screenshot]([https://your-image-url.com/image.png](https://drive.google.com/file/d/1eXMdzRFyOySrdkYVqzK3Z0n9om6Hd8vK/view?usp=sharing))
+![Commit App UI](./assets/images/mock.png)
 
 ## Installation & Setup
 ### Prerequisites
