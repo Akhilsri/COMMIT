@@ -4,7 +4,7 @@ Commit is a mobile application designed to help individuals overcome porn addict
 
 ## Features
 - **Two-Phase Recovery System**  
-  - **Reduction Phase**: 7/15/21-day logging journey to understand habits.  
+  - **Reduction Phase**: A 7/15/21-day self-logging journey where users record daily porn-watching hours, masturbation status, and mood to understand their habits and triggers.  
   - **Commitment Phase**: Streak-based challenge with accountability partner.
 - **Personalized Recovery Journey**: AI-driven insights to track and reduce addiction patterns.
 - **Gamified Challenges**: Daily, weekly, and monthly challenges tailored to user progress.
