@@ -20,6 +20,12 @@ Commit is a mobile application designed to help individuals overcome porn addict
 
 ![Commit App UI](./assets/images/mock.png)
 
+[Watch the demo video](https://www.youtube.com/watch?v=BpsHVBQUMyk)
+
+## 🚀 Try the MVP
+
+[Click here to use the app](https://drive.google.com/file/d/1xoYzXh-jYkQb7JpEFR8_4GmByeE3ye05/view)
+
 ## Installation & Setup
 ### Prerequisites
 - Node.js & npm/yarn
