@@ -3,8 +3,8 @@
 Commit is a mobile application designed to help individuals overcome porn addiction through AI-driven insights, structured challenges, and community support. Built using React Native, Firebase, and Gemini AI, Commit empowers users with personalized guidance and a gamified recovery journey.
 
 ## Features
--**Two-Phase Recovery System**
-  - **Reduction Phase**: 7/15/21-day logging journey to understand habits.
+- **Two-Phase Recovery System**  
+  - **Reduction Phase**: 7/15/21-day logging journey to understand habits.  
   - **Commitment Phase**: Streak-based challenge with accountability partner.
 - **Personalized Recovery Journey**: AI-driven insights to track and reduce addiction patterns.
 - **Gamified Challenges**: Daily, weekly, and monthly challenges tailored to user progress.
