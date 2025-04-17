@@ -25,7 +25,7 @@ Commit is a mobile application designed to help individuals overcome porn addict
 1. Clone the repository:
    ```sh
    git clone https://github.com/Akhilsri/COMMIT_HACKSTASY.git
-   cd COMMIT
+   cd COMMIT_HACKSTASY
    ```
 2. Install dependencies:
    ```sh
