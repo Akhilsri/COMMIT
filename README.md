@@ -15,6 +15,8 @@ Commit is a mobile application designed to help individuals overcome porn addict
 - **Firebase**: Authentication, Firestore database, storage, and notifications.
 - **Gemini AI**: AI-powered challenge generation and behavior analysis.
 
+![Commit Screenshot]([https://your-image-url.com/image.png](https://drive.google.com/file/d/1eXMdzRFyOySrdkYVqzK3Z0n9om6Hd8vK/view?usp=sharing))
+
 ## Installation & Setup
 ### Prerequisites
 - Node.js & npm/yarn
