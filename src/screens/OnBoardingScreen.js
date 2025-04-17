@@ -1,24 +1,36 @@
 import React from "react";
-import { View, Text, Image, TouchableOpacity, StyleSheet,StatusBar } from "react-native";
+import {
+  View,
+  Text,
+  Image,
+  TouchableOpacity,
+  StyleSheet,
+  StatusBar,
+} from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import {wp,hp} from '../helpers/common'
+import { wp, hp } from "../helpers/common";
 import BackButton from "../../assets/icons/BackButton";
 
 const OnboardingScreen = () => {
   const navigation = useNavigation();
+
   return (
     <View style={styles.container}>
-      <StatusBar backgroundColor={'#ff914d'} />
+      <StatusBar backgroundColor="#ff914d" barStyle="light-content" />
+
       <Image
         source={require("../../assets/images/buddha.png")}
         style={styles.image}
         resizeMode="contain"
       />
+
       <Text style={styles.title}>Welcome to Commit</Text>
+
       <Text style={styles.subtitle}>
         Overcome addiction through structured progress, AI insights, and
         community support.
       </Text>
+
       <TouchableOpacity
         style={styles.button}
         onPress={() => navigation.navigate("SignUpScreen")}
@@ -36,43 +48,43 @@ const styles = StyleSheet.create({
     backgroundColor: "#ff914d",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 10,
+    paddingHorizontal: wp(5),
   },
   image: {
     width: wp(90),
     height: hp(40),
-    marginBottom: 20,
+    marginBottom: hp(4),
   },
   title: {
     fontSize: hp(3.7),
     fontWeight: "bold",
     color: "white",
     textAlign: "center",
+    marginBottom: hp(2),
   },
   subtitle: {
     fontSize: hp(2),
     color: "white",
-    textAlign: "left",
-    marginVertical: 10,
-    paddingHorizontal: 15,
-    fontFamily:'Poppins-Regular'
+    textAlign: "center",
+    paddingHorizontal: wp(5),
+    fontFamily: "Poppins-Regular",
+    marginBottom: hp(5),
   },
   button: {
-    flex:1,
+    flexDirection: "row",
     backgroundColor: "white",
-    paddingVertical: 12,
-    paddingHorizontal: 50,
+    paddingVertical: hp(1.5),
+    paddingHorizontal: wp(10),
     borderRadius: 30,
-    marginTop: 20,
-    alignItems:'center',
-    maxHeight:hp(9),
-    marginBottom:hp(5)
+    alignItems: "center",
+    justifyContent: "center",
   },
   buttonText: {
     color: "#ff914d",
-    fontSize: 18,
+    fontSize: hp(2.2),
     fontWeight: "bold",
-  }
+    marginRight: 8,
+  },
 });
 
 export default OnboardingScreen;

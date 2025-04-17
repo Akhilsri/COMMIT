@@ -20,7 +20,7 @@ const AIInsights = ({ userData, logsData }) => {
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState({});
 
-  const API_KEY = process.env.GEMINI_API_KEY;
+  const API_KEY = process.env.GEMINI_API_KEY || "AIzaSyCpoHqpGBuRWwRFKt5gjmr484om35BL3q8";
   const genAI = new GoogleGenerativeAI(API_KEY);
 
   useEffect(() => {

@@ -1,338 +1,456 @@
-import React, { useEffect, useState } from "react";
-import { 
-  View, 
-  Text, 
-  ActivityIndicator, 
-  SafeAreaView, 
-  TouchableOpacity, 
+import React, { useEffect, useState, useRef } from 'react';
+import {
+  View,
+  Text,
+  ActivityIndicator,
+  SafeAreaView,
+  TouchableOpacity,
   Alert,
   StyleSheet,
   ScrollView,
   Dimensions,
-  Animated
-} from "react-native";
-import { LinearGradient } from 'react-native-linear-gradient';
-import { collection, getDocs, addDoc, query, where, getFirestore, doc, getDoc } from "firebase/firestore";
-import { app } from "../firebaseConfig";
+  Animated,
+  Platform,
+  StatusBar
+} from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
+import {
+  collection,
+  getDocs,
+  addDoc,
+  query,
+  where,
+  getFirestore,
+  doc,
+  onSnapshot,
+  updateDoc,
+  limit
+} from 'firebase/firestore';
+import { app, auth } from '../firebaseConfig';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { auth } from "../firebaseConfig";
 
 const db = getFirestore(app);
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
+
+// Responsive sizing helper
+const scale = size => (width / 375) * size;
+
+const CHALLENGE_TYPES = {
+  daily: {
+    colors: ['#654ea3', '#5a55ae'],
+    icon: 'calendar-today',
+    title: 'Daily'
+  },
+  weekly: {
+    colors: ['#2193b0', '#6dd5ed'],
+    icon: 'calendar-week',
+    title: 'Weekly'
+  },
+  monthly: {
+    colors: ['#ee9ca7', '#ffdde1'],
+    icon: 'calendar-month',
+    title: 'Monthly'
+  }
+};
 
 const ChallengeScreen = () => {
-  const [dailyChallenges, setDailyChallenges] = useState([]);
-  const [weeklyChallenges, setWeeklyChallenges] = useState([]);
-  const [monthlyChallenges, setMonthlyChallenges] = useState([]);
+  const [challenges, setChallenges] = useState({
+    daily: null,
+    weekly: null,
+    monthly: null
+  });
   const [loading, setLoading] = useState(true);
-  const [expandedSection, setExpandedSection] = useState('daily');
   const [userXP, setUserXP] = useState(0);
+  const [completedChallenges, setCompletedChallenges] = useState([]);
+  const [activeTab, setActiveTab] = useState('daily');
+  const [userLevel, setUserLevel] = useState(1);
+  const [streakDays, setStreakDays] = useState(0);
   
-  // Animation values
-  const dailyHeight = new Animated.Value(0);
-  const weeklyHeight = new Animated.Value(0);
-  const monthlyHeight = new Animated.Value(0);
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const fetchAllChallenges = async () => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 800,
+      useNativeDriver: true
+    }).start();
+  }, []);
+
+  useEffect(() => {
+    const fetchChallengesAndUserData = async () => {
       try {
-        // Fetch Daily Challenges
-        const dailySnapshot = await getDocs(collection(db, "dailyChallenges"));
-        const dailyData = dailySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setDailyChallenges(dailyData);
+        const user = auth.currentUser;
+        if (!user) throw new Error("User not authenticated");
+
+        // Subscribe to user data updates
+        const userRef = doc(db, "users", user.uid);
+        const userUnsubscribe = onSnapshot(userRef, (docSnap) => {
+          if (docSnap.exists()) {
+            const userData = docSnap.data();
+            setUserXP(userData.xp || 0);
+            
+            // Calculate level based on XP (example formula)
+            const level = Math.floor(Math.sqrt(userData.xp / 100)) + 1;
+            setUserLevel(level);
+            
+            // Get streak data
+            setStreakDays(userData.streakDays || 0);
+          }
+        });
+
+        // Subscribe to completed challenges
+        const completedRef = collection(db, "users", user.uid, "completedChallenges");
+        const completedUnsubscribe = onSnapshot(completedRef, (snapshot) => {
+          const completed = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          setCompletedChallenges(completed);
+        });
+
+        // Fetch one challenge of each type
+        const fetchedChallenges = {};
+        const sections = ['daily', 'weekly', 'monthly'];
         
-        // Fetch Weekly Challenges
-        const weeklySnapshot = await getDocs(collection(db, "weeklyChallenges"));
-        const weeklyData = weeklySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setWeeklyChallenges(weeklyData);
-        
-        // Fetch Monthly Challenges
-        const monthlySnapshot = await getDocs(collection(db, "monthlyChallenges"));
-        const monthlyData = monthlySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setMonthlyChallenges(monthlyData);
-        
-        // Fetch User XP
-        // Assuming user ID is stored somewhere - this is a placeholder
-        // In a real app, you would get the current user ID from authentication
-        const user = auth.currentUser
-        const userId = user.uid; 
-        const userDocRef = doc(db, "users", userId);
-        const userDoc = await getDoc(userDocRef);
-        
-        if (userDoc.exists()) {
-          setUserXP(userDoc.data().xp || 0);
+        for (const section of sections) {
+          const challengesQuery = query(
+            collection(db, `${section}Challenges`),
+            limit(3) // Fetch 3 challenges of each type
+          );
+          
+          const snap = await getDocs(challengesQuery);
+          fetchedChallenges[section] = snap.empty ? [] : 
+            snap.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data()
+            }));
         }
+        
+        setChallenges(fetchedChallenges);
+        setLoading(false);
+
+        return () => {
+          userUnsubscribe();
+          completedUnsubscribe();
+        };
       } catch (error) {
-        console.error("Error fetching challenges:", error);
-      } finally {
+        console.error("Failed to fetch challenges or user data:", error);
         setLoading(false);
       }
     };
 
-    fetchAllChallenges();
+    fetchChallengesAndUserData();
   }, []);
 
-  const toggleSection = (section) => {
-    let targetDaily = 0;
-    let targetWeekly = 0;
-    let targetMonthly = 0;
-    
-    if (section === 'daily') {
-      targetDaily = dailyChallenges.length * 170;
-    } else if (section === 'weekly') {
-      targetWeekly = weeklyChallenges.length * 170;
-    } else if (section === 'monthly') {
-      targetMonthly = monthlyChallenges.length * 170;
-    }
-    
-    Animated.parallel([
-      Animated.timing(dailyHeight, {
-        toValue: targetDaily,
-        duration: 300,
-        useNativeDriver: false
-      }),
-      Animated.timing(weeklyHeight, {
-        toValue: targetWeekly,
-        duration: 300,
-        useNativeDriver: false
-      }),
-      Animated.timing(monthlyHeight, {
-        toValue: targetMonthly,
-        duration: 300,
-        useNativeDriver: false
-      })
-    ]).start();
-    
-    setExpandedSection(section);
+  const isChallengeCompleted = (challenge) => {
+    if (!challenge) return false;
+    return completedChallenges.some(
+      comp => comp.task === challenge.task
+    );
   };
 
-  useEffect(() => {
-    // Initialize with daily section expanded
-    if (!loading) {
-      toggleSection('daily');
-    }
-  }, [loading]);
-
-  const markAsCompleted = async (challenge) => {
+  const markAsCompleted = async (challenge, type) => {
     try {
-      // Check if challenge is already completed
-      const completedQuery = query(
-        collection(db, "completedChallenges"),
-        where("task", "==", challenge.task)
-      );
-      const querySnapshot = await getDocs(completedQuery);
-
-      if (!querySnapshot.empty) {
-        Alert.alert("Already Completed", "You have already completed this challenge!");
+      const user = auth.currentUser;
+      if (!user) throw new Error("User not authenticated");
+      
+      if (isChallengeCompleted(challenge)) {
+        Alert.alert("Already Completed", "You already completed this challenge.");
         return;
       }
 
-      // Add completed challenge to Firestore
-      await addDoc(collection(db, "completedChallenges"), {
+      // Add to user's completedChallenges subcollection
+      const completedRef = collection(db, "users", user.uid, "completedChallenges");
+      await addDoc(completedRef, {
         ...challenge,
-        completedAt: new Date().toISOString(),
+        type,
+        completedAt: new Date().toISOString()
       });
-      
-      // Update user's XP (this is just for UI, you'd also need to update in Firebase)
-      const newXP = userXP + (challenge.reward || 0);
-      setUserXP(newXP);
-      
-      // In a real app, you would update the user's XP in Firestore here
-      // const userDocRef = doc(db, "users", "currentUserId");
-      // await updateDoc(userDocRef, { xp: newXP });
 
-      Alert.alert("Challenge Completed 🎉", `You have successfully completed "${challenge.task}" and earned ${challenge.reward} XP!`);
-    } catch (error) {
-      console.error("Error marking challenge as completed:", error);
-      Alert.alert("Error", "Failed to complete the challenge. Try again!");
+      // Update XP
+      const newXP = userXP + (challenge.reward || 0);
+      
+      // Update streak if it's a daily challenge
+      let updatedData = { xp: newXP };
+      if (type === 'daily') {
+        updatedData.streakDays = streakDays + 1;
+        updatedData.lastCompletedDate = new Date().toISOString().split('T')[0];
+      }
+      
+      await updateDoc(doc(db, "users", user.uid), updatedData);
+
+      Alert.alert("Success", `Completed '${challenge.task}' and earned ${challenge.reward} XP!`);
+    } catch (err) {
+      console.error("Error completing challenge:", err);
+      Alert.alert("Error", "Something went wrong.");
     }
   };
 
-  const renderChallengeItem = (item, index) => {
-    // Different colors for different difficulty levels
-    const difficultyColors = {
+  const renderChallengeCard = (challenge, type, index) => {
+    if (!challenge) return null;
+
+    const typeInfo = CHALLENGE_TYPES[type];
+    const completed = isChallengeCompleted(challenge);
+    const difficultyColor = {
       easy: '#4CAF50',
       medium: '#FF9800',
-      hard: '#F44336',
-    };
-    
-    const difficultyColor = difficultyColors[item.difficulty?.toLowerCase()] || '#4CAF50';
-    
+      hard: '#F44336'
+    }[challenge.difficulty?.toLowerCase()] || '#4CAF50';
+
+    // Slide in animation with delay based on index
+    const slideAnim = fadeAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [50 * (index + 1), 0]
+    });
+
     return (
-      <TouchableOpacity 
-        key={item.id || `challenge-${index}`}
-        style={styles.challengeCard}
-        activeOpacity={0.9}
+      <Animated.View 
+        style={[
+          { transform: [{ translateY: slideAnim }], opacity: fadeAnim },
+          { marginBottom: scale(12) }
+        ]}
+        key={challenge.id || index}
       >
         <LinearGradient
-          colors={['#f5f5f5', '#ffffff']}
-          style={styles.challengeCardGradient}
+          colors={typeInfo.colors}
+          start={{x: 0, y: 0}} 
+          end={{x: 1, y: 0}}
+          style={[styles.challengeCard, completed && styles.completedCardOverlay]}
         >
-          <View style={styles.challengeHeader}>
-            <View style={styles.challengeTypeContainer}>
-              <Text style={styles.challengeType}>{item.type}</Text>
-            </View>
-            <View style={[styles.difficultyBadge, {backgroundColor: difficultyColor}]}>
-              <Text style={styles.difficultyText}>{item.difficulty}</Text>
-            </View>
-          </View>
-          
-          <Text style={styles.challengeTask}>{item.task}</Text>
-          
-          <View style={styles.rewardAndAction}>
-            <View style={styles.rewardContainer}>
-              <Icon name="star" size={18} color="#FFD700" style={styles.starIcon} />
-              <Text style={styles.rewardText}>{item.reward} XP</Text>
+          <View style={styles.cardTop}>
+            <View style={styles.challengeIconContainer}>
+              <Icon name={typeInfo.icon} size={scale(18)} color="#FFF" />
             </View>
             
-            <TouchableOpacity
-              onPress={() => markAsCompleted(item)}
-              style={styles.completeButton}
-            >
-              <Icon name="check" size={16} color="white" />
-              <Text style={styles.completeButtonText}>Complete</Text>
-            </TouchableOpacity>
+            <View style={styles.challengeInfo}>
+              <Text style={styles.challengeTitle} numberOfLines={2} ellipsizeMode="tail">
+                {challenge.task}
+              </Text>
+              <View style={styles.challengeMeta}>
+                <View style={[styles.difficultyBadge, { backgroundColor: difficultyColor }]}>
+                  <Text style={styles.difficultyText}>{challenge.difficulty}</Text>
+                </View>
+                <View style={styles.rewardContainer}>
+                  <Icon name="star" size={scale(12)} color="#FFD700" />
+                  <Text style={styles.rewardText}>{challenge.reward} XP</Text>
+                </View>
+              </View>
+            </View>
           </View>
+          
+          <TouchableOpacity
+            onPress={() => markAsCompleted(challenge, type)}
+            style={[
+              styles.completeButton,
+              completed && styles.completedButton
+            ]}
+            disabled={completed}
+          >
+            {completed ? (
+              <View style={styles.buttonContent}>
+                <Icon name="check-circle" size={scale(16)} color="#FFF" />
+                <Text style={styles.completeButtonText}>Completed</Text>
+              </View>
+            ) : (
+              <View style={styles.buttonContent}>
+                <Text style={styles.completeButtonText}>Complete</Text>
+                <Icon name="arrow-right" size={scale(16)} color="#FFF" />
+              </View>
+            )}
+          </TouchableOpacity>
         </LinearGradient>
+      </Animated.View>
+    );
+  };
+
+  const headerOpacity = scrollY.interpolate({
+    inputRange: [0, 100],
+    outputRange: [1, 0.9],
+    extrapolate: 'clamp',
+  });
+
+  const headerScale = scrollY.interpolate({
+    inputRange: [0, 100],
+    outputRange: [1, 0.95],
+    extrapolate: 'clamp',
+  });
+
+  const renderTab = (type) => {
+    const typeInfo = CHALLENGE_TYPES[type];
+    const isActive = activeTab === type;
+    
+    return (
+      <TouchableOpacity
+        style={[styles.tab, isActive && styles.activeTab]}
+        onPress={() => setActiveTab(type)}
+      >
+        <Icon 
+          name={typeInfo.icon} 
+          size={scale(18)} 
+          color={isActive ? '#FFF' : '#4A4A4A'} 
+        />
+        <Text style={[
+          styles.tabText, 
+          isActive && styles.activeTabText
+        ]}>
+          {typeInfo.title}
+        </Text>
       </TouchableOpacity>
     );
   };
-  
+
+  const calculateLevelProgress = () => {
+    const currentLevelXP = (userLevel - 1) * (userLevel - 1) * 100;
+    const nextLevelXP = userLevel * userLevel * 100;
+    const requiredXP = nextLevelXP - currentLevelXP;
+    const currentProgress = userXP - currentLevelXP;
+    
+    return (currentProgress / requiredXP) * 100;
+  };
+
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#6200ea" />
+      <SafeAreaView style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#6366F1" />
         <Text style={styles.loadingText}>Loading your challenges...</Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
+  const activeChallenges = challenges[activeTab] || [];
+
   return (
     <SafeAreaView style={styles.container}>
-      <LinearGradient
-        colors={['#6200ea', '#9d4edd']}
-        start={{x: 0, y: 0}}
-        end={{x: 1, y: 0}}
-        style={styles.header}
-      >
-        <View style={styles.headerContent}>
-          <View style={styles.headerTextContainer}>
-            <Text style={styles.headerTitle}>Challenges</Text>
-            <Text style={styles.headerSubtitle}>Complete challenges to earn rewards</Text>
-          </View>
-          
-          {/* XP Display */}
-          <View style={styles.xpContainer}>
-            <LinearGradient
-              colors={['#8e44ad', '#6200ea']}
-              style={styles.xpBadge}
-            >
-              <Icon name="star-circle" size={20} color="#FFD700" />
-              <Text style={styles.xpText}>{userXP} XP</Text>
-            </LinearGradient>
-          </View>
-        </View>
-      </LinearGradient>
+      <StatusBar barStyle="light-content" backgroundColor="#6366F1" />
       
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Challenge Categories */}
-        <View style={styles.categoriesContainer}>
+      <Animated.View 
+        style={[
+          styles.headerContainer,
+          {
+            opacity: headerOpacity,
+            transform: [{ scale: headerScale }]
+          }
+        ]}
+      >
+        <LinearGradient
+          colors={['#6366F1', '#8B5CF6']}
+          start={{x: 0, y: 0}}
+          end={{x: 1, y: 1}}
+          style={styles.header}
+        >
+          <View style={styles.userInfoContainer}>
+            <View style={styles.userInfo}>
+              <View style={styles.avatarContainer}>
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>
+                    {auth.currentUser?.email?.[0]?.toUpperCase() || 'U'}
+                  </Text>
+                </View>
+                <View style={styles.levelBadge}>
+                  <Text style={styles.levelText}>{userLevel}</Text>
+                </View>
+              </View>
+              
+              <View style={styles.userStats}>
+                <Text style={styles.userName} numberOfLines={1} ellipsizeMode="tail">
+                  {auth.currentUser?.displayName || 'Challenger'}
+                </Text>
+                <View style={styles.xpContainer}>
+                  <Text style={styles.xpText}>{userXP} XP</Text>
+                  <View style={styles.progressBarContainer}>
+                    <View 
+                      style={[
+                        styles.progressBar, 
+                        { width: `${calculateLevelProgress()}%` }
+                      ]} 
+                    />
+                  </View>
+                </View>
+              </View>
+            </View>
+            
+            <TouchableOpacity style={styles.settingsButton}>
+              <Icon name="cog" size={scale(20)} color="#FFF" />
+            </TouchableOpacity>
+          </View>
           
-          {/* Daily Section */}
-          <TouchableOpacity 
-            style={[
-              styles.categoryHeader, 
-              expandedSection === 'daily' && styles.activeCategoryHeader
-            ]}
-            onPress={() => toggleSection('daily')}
-          >
-            <View style={styles.categoryTitleContainer}>
-              <Icon 
-                name="calendar-today" 
-                size={24} 
-                color={expandedSection === 'daily' ? "#6200ea" : "#555"} 
-              />
-              <Text style={[
-                styles.categoryTitle,
-                expandedSection === 'daily' && styles.activeCategoryTitle
-              ]}>
-                Daily Challenges
-              </Text>
+          <View style={styles.statsCards}>
+            <View style={styles.statCard}>
+              <Icon name="trophy" size={scale(20)} color="#FFD700" />
+              <Text style={styles.statValue}>{completedChallenges.length}</Text>
+              <Text style={styles.statLabel}>Completed</Text>
             </View>
-            <View style={styles.challengeCountContainer}>
-              <Text style={styles.challengeCount}>{dailyChallenges.length}</Text>
+            
+            <View style={styles.statCard}>
+              <Icon name="fire" size={scale(20)} color="#FF6B6B" />
+              <Text style={styles.statValue}>{streakDays}</Text>
+              <Text style={styles.statLabel}>Day Streak</Text>
             </View>
+            
+            <View style={styles.statCard}>
+              <Icon name="numeric" size={scale(20)} color="#4ECDC4" />
+              <Text style={styles.statValue}>{userLevel}</Text>
+              <Text style={styles.statLabel}>Level</Text>
+            </View>
+          </View>
+        </LinearGradient>
+      </Animated.View>
+      
+      <View style={styles.tabsContainer}>
+        {renderTab('daily')}
+        {renderTab('weekly')}
+        {renderTab('monthly')}
+      </View>
+      
+      <Animated.ScrollView
+        style={styles.content}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false }
+        )}
+      >
+        <View style={styles.challengesHeader}>
+          <Text style={styles.challengesTitle}>
+            {CHALLENGE_TYPES[activeTab].title} Challenges
+          </Text>
+          <TouchableOpacity style={styles.refreshButton}>
+            <Icon name="refresh" size={scale(18)} color="#6366F1" />
           </TouchableOpacity>
-          
-          <Animated.View style={[styles.challengesContainer, {height: dailyHeight}]}>
-            {dailyChallenges.map((item, index) => renderChallengeItem(item, `daily-${index}`))}
-          </Animated.View>
-          
-          {/* Weekly Section */}
-          <TouchableOpacity 
-            style={[
-              styles.categoryHeader, 
-              expandedSection === 'weekly' && styles.activeCategoryHeader
-            ]}
-            onPress={() => toggleSection('weekly')}
-          >
-            <View style={styles.categoryTitleContainer}>
-              <Icon 
-                name="calendar-week" 
-                size={24} 
-                color={expandedSection === 'weekly' ? "#6200ea" : "#555"} 
-              />
-              <Text style={[
-                styles.categoryTitle,
-                expandedSection === 'weekly' && styles.activeCategoryTitle
-              ]}>
-                Weekly Challenges
-              </Text>
-            </View>
-            <View style={styles.challengeCountContainer}>
-              <Text style={styles.challengeCount}>{weeklyChallenges.length}</Text>
-            </View>
-          </TouchableOpacity>
-          
-          <Animated.View style={[styles.challengesContainer, {height: weeklyHeight}]}>
-            {weeklyChallenges.map((item, index) => renderChallengeItem(item, `weekly-${index}`))}
-          </Animated.View>
-          
-          {/* Monthly Section */}
-          <TouchableOpacity 
-            style={[
-              styles.categoryHeader, 
-              expandedSection === 'monthly' && styles.activeCategoryHeader
-            ]}
-            onPress={() => toggleSection('monthly')}
-          >
-            <View style={styles.categoryTitleContainer}>
-              <Icon 
-                name="calendar-month" 
-                size={24} 
-                color={expandedSection === 'monthly' ? "#6200ea" : "#555"} 
-              />
-              <Text style={[
-                styles.categoryTitle,
-                expandedSection === 'monthly' && styles.activeCategoryTitle
-              ]}>
-                Monthly Challenges
-              </Text>
-            </View>
-            <View style={styles.challengeCountContainer}>
-              <Text style={styles.challengeCount}>{monthlyChallenges.length}</Text>
-            </View>
-          </TouchableOpacity>
-          
-          <Animated.View style={[styles.challengesContainer, {height: monthlyHeight}]}>
-            {monthlyChallenges.map((item, index) => renderChallengeItem(item, `monthly-${index}`))}
-          </Animated.View>
         </View>
         
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Complete challenges to progress in your journey</Text>
+        {activeChallenges.length === 0 ? (
+          <View style={styles.emptyStateContainer}>
+            <Icon name="calendar-remove" size={scale(50)} color="#DDD" />
+            <Text style={styles.emptyStateText}>
+              No {activeTab} challenges available
+            </Text>
+            <TouchableOpacity style={styles.refreshButtonLarge}>
+              <Text style={styles.refreshButtonText}>Refresh Challenges</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.challengesContainer}>
+            {activeChallenges.map((challenge, index) => 
+              renderChallengeCard(challenge, activeTab, index)
+            )}
+          </View>
+        )}
+        
+        <View style={styles.tipsContainer}>
+          <Text style={styles.tipsTitle}>Challenge Tips</Text>
+          <View style={styles.tipCard}>
+            <Icon name="lightbulb-outline" size={scale(18)} color="#6366F1" />
+            <Text style={styles.tipText}>
+              Complete daily challenges consistently to maintain your streak 
+              and earn bonus rewards!
+            </Text>
+          </View>
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
     </SafeAreaView>
   );
 };
@@ -340,206 +458,375 @@ const ChallengeScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f7',
+    backgroundColor: '#F9FAFB',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#F9FAFB'
   },
   loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: '#6200ea',
+    marginTop: scale(16),
+    fontSize: scale(14),
+    color: '#6366F1',
+    fontWeight: '500'
+  },
+  headerContainer: {
+    width: '100%',
+    overflow: 'hidden',
+    borderBottomLeftRadius: scale(20),
+    borderBottomRightRadius: scale(20),
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4
+      },
+      android: {
+        elevation: 3
+      }
+    })
   },
   header: {
-    paddingVertical: 25,
-    paddingHorizontal: 20,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    elevation: 4,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight || 20 : scale(16),
+    paddingBottom: scale(16),
+    paddingHorizontal: scale(16),
+    borderBottomLeftRadius: scale(20),
+    borderBottomRightRadius: scale(20),
   },
-  headerContent: {
+  userInfoContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: scale(12)
   },
-  headerTextContainer: {
+  userInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
   },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 5,
+  avatarContainer: {
+    position: 'relative',
+    marginRight: scale(10)
   },
-  headerSubtitle: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.8)',
+  avatar: {
+    width: scale(40),
+    height: scale(40),
+    borderRadius: scale(20),
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  avatarText: {
+    color: '#FFF',
+    fontSize: scale(18),
+    fontWeight: 'bold'
+  },
+  levelBadge: {
+    position: 'absolute',
+    bottom: -5,
+    right: -5,
+    width: scale(18),
+    height: scale(18),
+    borderRadius: scale(9),
+    backgroundColor: '#10B981',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFF'
+  },
+  levelText: {
+    color: '#FFF',
+    fontSize: scale(10),
+    fontWeight: 'bold'
+  },
+  userStats: {
+    flex: 1,
+  },
+  userName: {
+    color: '#FFF',
+    fontSize: scale(16),
+    fontWeight: 'bold',
+    marginBottom: 2
   },
   xpContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  xpBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.3)',
+    width: '100%',
   },
   xpText: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 16,
-    marginLeft: 5,
+    color: '#FFF',
+    fontSize: scale(12),
+    marginBottom: 2
   },
-  scrollView: {
-    flex: 1,
+  progressBarContainer: {
+    height: 3,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    borderRadius: 1.5,
+    width: '100%'
   },
-  categoriesContainer: {
-    paddingHorizontal: 15,
-    paddingTop: 20,
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#FFF',
+    borderRadius: 1.5
   },
-  categoryHeader: {
-    flexDirection: 'row',
+  settingsButton: {
+    width: scale(32),
+    height: scale(32),
+    borderRadius: scale(16),
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
     alignItems: 'center',
+    marginLeft: scale(8)
+  },
+  statsCards: {
+    flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 15,
-    paddingHorizontal: 15,
-    backgroundColor: 'white',
-    borderRadius: 15,
-    marginBottom: 5,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1.5,
+    paddingTop: scale(8),
+    marginHorizontal: -scale(4)
   },
-  activeCategoryHeader: {
-    backgroundColor: '#f0e6ff',
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-    marginBottom: 0,
-    borderTopWidth: 3,
-    borderTopColor: '#6200ea',
+  statCard: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: scale(8),
+    paddingHorizontal: scale(6),
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: scale(10),
+    marginHorizontal: scale(4)
   },
-  categoryTitleContainer: {
+  statValue: {
+    color: '#FFF',
+    fontSize: scale(16),
+    fontWeight: 'bold',
+    marginTop: scale(4),
+    marginBottom: 0
+  },
+  statLabel: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: scale(10)
+  },
+  tabsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: scale(16),
+    paddingVertical: scale(10),
+    backgroundColor: '#FFF',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2
+      },
+      android: {
+        elevation: 1
+      }
+    })
+  },
+  tab: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: scale(8),
+    borderRadius: scale(8),
+    marginHorizontal: scale(3)
   },
-  categoryTitle: {
-    fontSize: 18,
+  activeTab: {
+    backgroundColor: '#6366F1',
+  },
+  tabText: {
+    fontSize: scale(12),
+    fontWeight: '600',
+    color: '#4A4A4A',
+    marginLeft: scale(4)
+  },
+  activeTabText: {
+    color: '#FFF'
+  },
+  content: {
+    flex: 1
+  },
+  contentContainer: {
+    paddingHorizontal: scale(16),
+    paddingTop: scale(16),
+    paddingBottom: scale(32)
+  },
+  challengesHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: scale(12)
+  },
+  challengesTitle: {
+    fontSize: scale(16),
     fontWeight: 'bold',
-    color: '#333',
-    marginLeft: 10,
+    color: '#111827'
   },
-  activeCategoryTitle: {
-    color: '#6200ea',
+  refreshButton: {
+    width: scale(32),
+    height: scale(32),
+    borderRadius: scale(16),
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center'
   },
-  challengeCountContainer: {
-    backgroundColor: '#f0f0f0',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
+  emptyStateContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: scale(32),
+    backgroundColor: '#F3F4F6',
+    borderRadius: scale(12),
+    marginBottom: scale(20)
   },
-  challengeCount: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#555',
+  emptyStateText: {
+    fontSize: scale(14),
+    color: '#6B7280',
+    marginTop: scale(12),
+    marginBottom: scale(16)
+  },
+  refreshButtonLarge: {
+    backgroundColor: '#6366F1',
+    paddingHorizontal: scale(16),
+    paddingVertical: scale(10),
+    borderRadius: scale(8)
+  },
+  refreshButtonText: {
+    color: '#FFF',
+    fontWeight: '600',
+    fontSize: scale(13)
   },
   challengesContainer: {
-    backgroundColor: 'white',
-    borderBottomLeftRadius: 15,
-    borderBottomRightRadius: 15,
-    marginBottom: 20,
-    overflow: 'hidden',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1.5,
+    marginBottom: scale(20)
   },
   challengeCard: {
-    marginVertical: 5,
-    marginHorizontal: 10,
-    borderRadius: 12,
-    overflow: 'hidden',
-    elevation: 1,
+    borderRadius: scale(12),
+    padding: scale(14),
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 3
+      },
+      android: {
+        elevation: 2
+      }
+    })
   },
-  challengeCardGradient: {
-    padding: 15,
+  completedCardOverlay: {
+    opacity: 0.8,
   },
-  challengeHeader: {
+  cardTop: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: scale(12)
   },
-  challengeTypeContainer: {
+  challengeIconContainer: {
+    width: scale(32),
+    height: scale(32),
+    borderRadius: scale(8),
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: scale(10)
+  },
+  challengeInfo: {
+    flex: 1,
+  },
+  challengeTitle: {
+    fontSize: scale(14),
+    fontWeight: '600',
+    color: '#FFF',
+    marginBottom: scale(6),
+    lineHeight: scale(18)
+  },
+  challengeMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  challengeType: {
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '500',
+    flexWrap: 'wrap'
   },
   difficultyBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
+    paddingHorizontal: scale(6),
+    paddingVertical: scale(3),
+    borderRadius: scale(6),
+    marginRight: scale(6),
+    marginBottom: scale(4)
   },
   difficultyText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  challengeTask: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 10,
-  },
-  rewardAndAction: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    color: '#FFF',
+    fontSize: scale(10),
+    fontWeight: 'bold'
   },
   rewardContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  starIcon: {
-    marginRight: 4,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: scale(6),
+    paddingVertical: scale(3),
+    borderRadius: scale(6),
+    marginBottom: scale(4)
   },
   rewardText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#555',
+    color: '#FFF',
+    fontSize: scale(10),
+    fontWeight: '600',
+    marginLeft: scale(3)
   },
   completeButton: {
-    backgroundColor: '#6200ea',
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    paddingVertical: scale(10),
+    borderRadius: scale(8),
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  completedButton: {
+    backgroundColor: 'rgba(16, 185, 129, 0.6)'
+  },
+  buttonContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 15,
-    borderRadius: 20,
+    justifyContent: 'center'
   },
   completeButtonText: {
-    color: 'white',
+    color: '#FFF',
     fontWeight: 'bold',
-    marginLeft: 5,
+    fontSize: scale(14),
+    marginHorizontal: scale(6)
   },
-  footer: {
-    padding: 20,
-    alignItems: 'center',
+  tipsContainer: {
+    marginBottom: scale(16)
   },
-  footerText: {
-    color: '#888',
-    fontStyle: 'italic',
+  tipsTitle: {
+    fontSize: scale(16),
+    fontWeight: 'bold',
+    color: '#111827',
+    marginBottom: scale(10)
+  },
+  tipCard: {
+    backgroundColor: '#FFF',
+    borderRadius: scale(12),
+    padding: scale(14),
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2
+      },
+      android: {
+        elevation: 1
+      }
+    })
+  },
+  tipText: {
+    color: '#4B5563',
+    fontSize: scale(12),
+    lineHeight: scale(18),
+    marginLeft: scale(10),
+    flex: 1
   }
 });
 

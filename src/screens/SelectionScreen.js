@@ -1,76 +1,111 @@
 import React, { useContext, useEffect, useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, StatusBar, Alert } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  StatusBar,
+  Alert,
+} from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { useNavigation } from "@react-navigation/native";
-import BackButton from "../../assets/icons/BackButton";
-import { wp, hp } from "../helpers/common";
 import { useUser } from "../context/UserContext";
-import { getFirestore, doc, setDoc } from "firebase/firestore"; 
+import { getFirestore, doc, setDoc } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const SelectionScreen = () => {
   const navigation = useNavigation();
   const [clicked, setClicked] = useState(false);
   const [clicked2, setClicked2] = useState(false);
   const [reductionDays, setReductionDays] = useState(null);
-  const {userData2,setUserData } = useUser();
+  const { setUserData } = useUser();
+  const [showSelection, setShowSelection] = useState(false);
+
+  useEffect(() => {
+    const checkFirstLaunch = async () => {
+      try {
+        const selectionMade = await AsyncStorage.getItem("selectionMade");
+        if (selectionMade === null) {
+          setShowSelection(true);
+        } 
+      } catch (error) {
+        console.error("Error checking selection status:", error);
+      }
+    };
+    
+    checkFirstLaunch();
+  }, [navigation]);
 
   const getLocalDate = () => {
     const now = new Date();
-    now.setMinutes(now.getMinutes() - now.getTimezoneOffset()); // Adjust to local timezone
-    return now.toISOString().split("T")[0]; // Extract YYYY-MM-DD
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    return now.toISOString().split("T")[0];
   };
 
   const calculateEndDate = (startDate, reductionDays) => {
     const start = new Date(startDate);
-    start.setDate(start.getDate() + reductionDays); // Add reductionDays
-    return start.toISOString().split("T")[0]; // Return as 'YYYY-MM-DD'
+    start.setDate(start.getDate() + reductionDays);
+    return start.toISOString().split("T")[0];
   };
-  
 
- 
-  
   const handleNext = async () => {
     const startDate = getLocalDate();
     const endDate = calculateEndDate(startDate, reductionDays);
-  
-    if (clicked2 || (clicked && reductionDays)) {
+    let phase = null;
+
+    if (clicked2) {
+      phase = "commitment";
+    } else if (clicked && reductionDays) {
+      phase = "reduction";
+    }
+
+    if (phase) {
       const newUserData = {
-        phase: clicked ? "reduction" : "commitment", 
+        phase: phase,
         reductionDays: clicked ? reductionDays : null,
         startDate: startDate,
         endDate: endDate,
         streak: 0,
+        profilePic : "",
+        achievements : {"badge_7day" : "false","badge_15day" : "false","badge_15day" : "false"}
       };
-  
-      setUserData(newUserData); // Update context for immediate use
-  
+
+      setUserData(newUserData);
+
       try {
         const auth = getAuth();
         const db = getFirestore();
-        const user = auth.currentUser; // Get the logged-in user
-        
+        const user = auth.currentUser;
+
         if (!user) {
           console.error("No user is logged in.");
           return;
         }
-  
-        // Create or update document with the same ID as the user's UID
+
         const userRef = doc(db, "users", user.uid);
         await setDoc(userRef, newUserData, { merge: true });
-  
-        console.log("User data saved successfully!");
-        navigation.navigate("BottomTabNavigator");
-  
+        await AsyncStorage.setItem("selectionMade", "true");
+        // Pass the data as route parameters
+        navigation.navigate("UserDetails", { 
+          startDate: startDate,
+          endDate: endDate,
+          phase: phase,
+          reductionDays: reductionDays,
+          streak: 0,
+          xp:0,
+          profilePic : "",
+          achievements : {"badge_7day" : "false","badge_15day" : "false","badge_15day" : "false"}
+        });
       } catch (error) {
         console.error("Error saving user data:", error);
       }
     } else {
-      Alert.alert("Please choose an option and duration if selecting Reduction Phase");
+      Alert.alert(
+        "Please choose an option and duration if selecting Reduction Phase"
+      );
     }
   };
-  
-
 
 
   const handleClick = () => {
@@ -87,24 +122,38 @@ const SelectionScreen = () => {
     setClicked2(!clicked2);
   };
 
+  if (!showSelection) {
+    return null;
+  }
+
   return (
     <View style={styles.container}>
       <StatusBar backgroundColor={"#F47C26"} />
 
-      {/* Heading */}
       <Text style={styles.questionText}>Question</Text>
       <Text style={styles.mainHeading}>
         Why <Text style={{ color: "white" }}>are you here?</Text>
       </Text>
 
-      {/* Option 1: Reduction Phase */}
       <TouchableOpacity onPress={handleClick}>
         <View style={styles.optionContainer}>
           <View style={styles.optionNumber}>
             <Text style={styles.optionNumberText}>1</Text>
           </View>
-          <View style={[styles.optionTextContainer, { backgroundColor: clicked ? "green" : "white" }]}>
-            <Text style={[styles.optionText, { color: clicked ? "white" : "black" }]}>I want to gradually reduce my porn addiction.</Text>
+          <View
+            style={[
+              styles.optionTextContainer,
+              { backgroundColor: clicked ? "green" : "white" },
+            ]}
+          >
+            <Text
+              style={[
+                styles.optionText,
+                { color: clicked ? "white" : "black" },
+              ]}
+            >
+              I want to gradually reduce my porn addiction.
+            </Text>
             <View style={styles.phaseBox}>
               <Text style={styles.phaseText}>
                 Reduction Phase: Track and understand your habits.
@@ -114,7 +163,6 @@ const SelectionScreen = () => {
         </View>
       </TouchableOpacity>
 
-      {/* Reduction Phase Duration Selection */}
       {clicked && (
         <View style={styles.reductionOptions}>
           <Text style={styles.reductionText}>Select Duration:</Text>
@@ -123,27 +171,42 @@ const SelectionScreen = () => {
               key={days}
               style={[
                 styles.reductionButton,
-                reductionDays === days ? styles.reductionButtonSelected : {}
+                reductionDays === days ? styles.reductionButtonSelected : {},
               ]}
               onPress={() => setReductionDays(days)}
             >
-              <Text style={[
-                styles.reductionButtonText,
-                reductionDays === days ? { color: "white" } : {}
-              ]}>{days} Days</Text>
+              <Text
+                style={[
+                  styles.reductionButtonText,
+                  reductionDays === days ? { color: "white" } : {},
+                ]}
+              >
+                {days} Days
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
       )}
 
-      {/* Option 2: Commitment Phase */}
       <TouchableOpacity onPress={handleClick2}>
         <View style={styles.optionContainer}>
           <View style={styles.optionNumber}>
             <Text style={styles.optionNumberText}>2</Text>
           </View>
-          <View style={[styles.optionTextContainer, { backgroundColor: clicked2 ? "green" : "white" }]}>
-            <Text style={[styles.optionText, { color: clicked2 ? "white" : "black" }]}>I want to completely quit and commit now.</Text>
+          <View
+            style={[
+              styles.optionTextContainer,
+              { backgroundColor: clicked2 ? "green" : "white" },
+            ]}
+          >
+            <Text
+              style={[
+                styles.optionText,
+                { color: clicked2 ? "white" : "black" },
+              ]}
+            >
+              I want to completely quit and commit now.
+            </Text>
             <View style={styles.phaseBox}>
               <Text style={styles.phaseText}>
                 Commitment Phase: Set clean streak goals means no masturbation.
@@ -153,7 +216,6 @@ const SelectionScreen = () => {
         </View>
       </TouchableOpacity>
 
-      {/* Next Button */}
       <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
         <Text style={styles.nextButtonText}>Next</Text>
         <Svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -167,10 +229,9 @@ const SelectionScreen = () => {
         </Svg>
       </TouchableOpacity>
 
-      {/* Footer Quote */}
       <Text style={styles.footerText}>
-        ~Swami Vivekananda said that if you save your semen for more than 12 years in a row,
-        you can achieve picture memory like him~
+        ~Swami Vivekananda said that if you save your semen for more than 12
+        years in a row, you can achieve picture memory like him~
       </Text>
     </View>
   );
@@ -186,7 +247,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: "white",
     fontWeight: "bold",
-    marginTop: hp(9),
   },
   mainHeading: {
     fontSize: 22,
@@ -236,8 +296,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     marginTop: 10,
-    alignItems:'center',
-    marginHorizontal:10
+    alignItems: "center",
+    marginHorizontal: 10,
   },
   reductionText: {
     fontSize: 13,
@@ -250,7 +310,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 5,
     borderRadius: 10,
     backgroundColor: "white",
-    
   },
   reductionButtonSelected: {
     backgroundColor: "green",

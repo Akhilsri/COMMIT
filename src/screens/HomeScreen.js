@@ -32,8 +32,9 @@ import PornWatchBarChart from '../components/BarGraph';
 import MasturbationBarChart from '../components/MasturbationChart';
 import MotivationCard from '../components/MotivationCard';
 import AIInsights from '../components/AIInsights';
+import { useNavigation } from '@react-navigation/native';
 
-const HomeScreen = () => {
+const HomeScreen = ({navigation}) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedDate, setSelectedDate] = useState('');
   const {userData2} = useUser();
@@ -130,6 +131,20 @@ const HomeScreen = () => {
       });
       return;
     }
+
+    const updateBadgeStatus = async (userId, daysClean) => {
+      const userRef = firestore().collection('users').doc(userId);
+      const doc = await userRef.get();
+      const currentAchievements = doc.data().achievements || {};
+    
+      if (daysClean >= 7 && !currentAchievements['badge_7day']) {
+        await userRef.update({
+          [`achievements.badge_7day`]: true
+        });
+        // Optionally show a modal/notification: 🎉 You earned a badge!
+      }
+    };
+    
   
     // If a new day has started, update the streak
     if (userData.lastUpdatedDate !== today) {
@@ -307,11 +322,43 @@ const HomeScreen = () => {
           end={{x: 1, y: 1}}
           style={styles.headerGradient}
         >
+        
           <Text style={styles.phaseTitle}>
             {userData2.phase === 'reduction'
               ? 'Reduction Phase'
               : 'Committing Phase'}
           </Text>
+
+          <TouchableOpacity onPress={()=>navigation.navigate("MeditationScreen")} activeOpacity={0.7}>
+      <View
+        style={{
+          backgroundColor: 'white',
+          paddingVertical: 10,
+          paddingHorizontal: 25,
+          borderRadius: 8,
+          alignItems: 'center',
+          justifyContent: 'center',
+          // Shadow for iOS
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.25,
+          shadowRadius: 3.84,
+          // Elevation for Android
+          elevation: 5,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 18,
+            fontWeight: 'bold',
+            color: 'red',
+          }}
+        >
+          ⚡SOS
+        </Text>
+      </View>
+    </TouchableOpacity>
+          
         </LinearGradient>
 
         <View style={styles.container}>
@@ -784,6 +831,12 @@ const calendarTheme = {
       flexDirection: 'row',
       justifyContent: 'space-between',
     },
+    SOS:{
+      fontWeight:'bold'
+    },
+    box:{
+      backgroundColor:'white'
+    }
   }
 };
 

@@ -16,12 +16,15 @@ import { auth, db } from "../firebaseConfig";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import * as ImagePicker from "react-native-image-picker"; 
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useNavigation } from "@react-navigation/native";
 
 const { width } = Dimensions.get('window');
 
 const ProfileScreen = () => {
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const navigation = useNavigation();
   
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -70,8 +73,11 @@ const ProfileScreen = () => {
 
   const handleSignOut = async () => {
     try {
+      await AsyncStorage.clear();
       await signOut(auth);
-      Alert.alert("Signed Out", "You have been successfully signed out!");
+      // Alert.alert("Signed Out", "You have been successfully signed out!");
+      // navigation.navigate('OnBoardingScreen')
+      
     } catch (error) {
       console.error("Error signing out:", error);
     }
@@ -140,7 +146,7 @@ const ProfileScreen = () => {
           </Animated.View>
         </TouchableOpacity>
         
-        <Text style={styles.username}>{userData?.username || "Username"}</Text>
+        <Text style={styles.username}>{userData?.fullName || "Username"}</Text>
         <Text style={styles.email}>{userData?.email}</Text>
       </Animated.View>
 

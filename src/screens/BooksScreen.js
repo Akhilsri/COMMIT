@@ -73,8 +73,8 @@ const BooksScreen = () => {
 
   const ListHeaderComponent = () => (
     <View style={styles.header}>
-      <Text style={styles.headerTitle}>Discover</Text>
-      <Text style={styles.headerSubtitle}>Find your next great read</Text>
+      <Text style={styles.headerTitle}>Sex Education</Text>
+      <Text style={styles.headerSubtitle}>Quality resources for informed decisions</Text>
       <TouchableOpacity 
         style={styles.searchBar}
         onPress={() => navigation.navigate("SearchScreen")}
@@ -82,23 +82,33 @@ const BooksScreen = () => {
         <View style={styles.searchIconContainer}>
           <Text style={styles.searchIconPlaceholder}>🔍</Text>
         </View>
-        <Text style={styles.searchPlaceholder}>Search books, authors...</Text>
+        <Text style={styles.searchPlaceholder}>Search topics, resources...</Text>
       </TouchableOpacity>
+      
+      
     </View>
+  );
+
+  // Scrollable category component for header
+  const ScrollableCategory = ({ title, emoji }) => (
+    <TouchableOpacity style={styles.categoryButton}>
+      <Text style={styles.categoryEmoji}>{emoji}</Text>
+      <Text style={styles.categoryText}>{title}</Text>
+    </TouchableOpacity>
   );
 
   if (loading && books.length === 0) {
     return (
       <View style={styles.loadingFullScreen}>
-        <ActivityIndicator size="large" color="#6200ee" />
-        <Text style={styles.loadingText}>Loading books...</Text>
+        <ActivityIndicator size="large" color="#FF5E85" />
+        <Text style={styles.loadingText}>Loading resources...</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      <StatusBar barStyle="light-content" backgroundColor="#FF5E85" />
       <FlatList
         data={books}
         keyExtractor={(item) => item.id || String(Math.random())}
@@ -110,7 +120,7 @@ const BooksScreen = () => {
         ListEmptyComponent={
           !loading ? (
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No books found</Text>
+              <Text style={styles.emptyText}>No resources found</Text>
               <TouchableOpacity 
                 style={styles.retryButton}
                 onPress={() => loadBooks()}
@@ -126,11 +136,9 @@ const BooksScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  // Existing styles remain the same...
-  // Only adding styles that were referenced but not defined above
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#FFF0F5", // Light pink background
   },
   listContainer: {
     padding: 16,
@@ -138,25 +146,36 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 24,
+    backgroundColor: "#FF5E85", // "Sex Education" show's vibrant pink
+    padding: 16,
+    borderRadius: 16,
+    marginTop: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   headerTitle: {
-    fontSize: 28,
-    fontWeight: "700",
-    color: "#1a1a1a",
+    fontSize: 32,
+    fontWeight: "800",
+    color: "#ffffff",
     marginBottom: 4,
+    fontFamily: "System",
   },
   headerSubtitle: {
     fontSize: 16,
-    color: "#666",
+    color: "#ffffff",
     marginBottom: 16,
+    opacity: 0.9,
   },
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f5f5f5",
-    borderRadius: 12,
+    backgroundColor: "rgba(255, 255, 255, 0.8)",
+    borderRadius: 24,
     padding: 12,
     marginTop: 8,
+    marginBottom: 16,
   },
   searchIconContainer: {
     marginRight: 8,
@@ -167,6 +186,29 @@ const styles = StyleSheet.create({
   searchPlaceholder: {
     color: "#888",
     fontSize: 15,
+  },
+  categoriesContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 8,
+  },
+  categoryButton: {
+    backgroundColor: "rgba(255, 255, 255, 0.8)",
+    borderRadius: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 70,
+  },
+  categoryEmoji: {
+    fontSize: 20,
+    marginBottom: 4,
+  },
+  categoryText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#FF5E85",
   },
   bookCard: {
     flex: 1,
@@ -179,6 +221,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    borderWidth: 0.5,
+    borderColor: "rgba(255, 94, 133, 0.2)", // Very light pink border
   },
   imageContainer: {
     position: "relative",
@@ -193,7 +237,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 8,
     right: 8,
-    backgroundColor: "rgba(0,0,0,0.7)",
+    backgroundColor: "#FF5E85",
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -209,18 +253,18 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#1a1a1a",
+    color: "#333",
     marginBottom: 4,
   },
   author: {
     fontSize: 14,
-    color: "#666",
+    color: "#777",
     marginBottom: 12,
   },
   readButton: {
-    backgroundColor: "#6200ee",
+    backgroundColor: "#FF5E85",
     paddingVertical: 8,
-    borderRadius: 8,
+    borderRadius: 24,
     alignItems: "center",
   },
   readButtonText: {
@@ -232,12 +276,13 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#fff",
+    backgroundColor: "#FFF0F5",
   },
   loadingText: {
     marginTop: 12,
-    color: "#666",
+    color: "#FF5E85",
     fontSize: 16,
+    fontWeight: "500",
   },
   emptyContainer: {
     padding: 20,
@@ -249,10 +294,10 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   retryButton: {
-    backgroundColor: "#6200ee",
+    backgroundColor: "#FF5E85",
     paddingVertical: 8,
     paddingHorizontal: 16,
-    borderRadius: 8,
+    borderRadius: 24,
   },
   retryButtonText: {
     color: "#fff",

@@ -10,11 +10,14 @@ import {
   TextInput,
   StatusBar
 } from "react-native";
-import { fetchBlogs } from "../helpers/fetchBooks";
+import { db } from "../firebaseConfig"; // Import Firestore db from your firebase config
+import { collection, onSnapshot } from "firebase/firestore";
 import { Card, Chip } from "react-native-paper";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { useNavigation } from "@react-navigation/native";
 import LinearGradient from "react-native-linear-gradient";
+import { query, orderBy } from "firebase/firestore";
+
 
 const BlogsScreen = () => {
   const [blogs, setBlogs] = useState([]);
@@ -23,18 +26,27 @@ const BlogsScreen = () => {
   const navigation = useNavigation();
 
   useEffect(() => {
-    const getBlogs = async () => {
-      setLoading(true);
-      try {
-        const blogsData = await fetchBlogs();
+    const q = query(collection(db, "blogs"), orderBy("createdAt", "desc"));
+  
+    // Set up the real-time listener to fetch blogs from Firestore
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (snapshot.empty) {
+        console.log("No blogs found.");
+      } else {
+        const blogsData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        console.log("Fetched blogs:", blogsData); // Log fetched blogs
         setBlogs(blogsData);
-      } catch (error) {
-        console.error("Error fetching blogs:", error);
+        setLoading(false);
       }
-      setLoading(false);
-    };
-
-    getBlogs();
+    }, (error) => {
+      console.error("Error fetching blogs:", error); // Log any errors
+    });
+  
+    // Clean up the listener when the component unmounts
+    return () => unsubscribe();
   }, []);
 
   const renderTabs = () => (
@@ -43,17 +55,9 @@ const BlogsScreen = () => {
         <TouchableOpacity 
           key={tab} 
           onPress={() => setActiveTab(tab)}
-          style={[
-            styles.tabButton,
-            activeTab === tab ? styles.activeTabButton : null
-          ]}
+          style={[styles.tabButton, activeTab === tab ? styles.activeTabButton : null]}
         >
-          <Text 
-            style={[
-              styles.tabText,
-              activeTab === tab ? styles.activeTabText : null
-            ]}
-          >
+          <Text style={[styles.tabText, activeTab === tab ? styles.activeTabText : null]}>
             {tab}
           </Text>
         </TouchableOpacity>
