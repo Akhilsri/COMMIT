@@ -47,5 +47,3 @@ Commit is a mobile application designed to help individuals overcome porn addict
 2. Make changes and commit.
 3. Submit a pull request.
 
-## License
-This project is licensed under the MIT License.
