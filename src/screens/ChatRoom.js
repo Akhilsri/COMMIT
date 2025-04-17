@@ -11,29 +11,26 @@ const ChatRoom = ({ route }) => {
   const [bannedUsers, setBannedUsers] = useState([]);
   const [longPressedMessage, setLongPressedMessage] = useState(null);
 
-  // Check if current user is a moderator
   useEffect(() => {
     const checkModeratorStatus = async () => {
       const userRef = doc(db, "users", auth.currentUser.uid);
       const userSnap = await getDoc(userRef);
-      
+
       if (userSnap.exists() && userSnap.data().isModerator) {
         setIsUserModerator(true);
       }
-      
-      // Get list of banned users for this room
+
       const roomRef = doc(db, "chatRooms", roomId);
       const roomSnap = await getDoc(roomRef);
-      
+
       if (roomSnap.exists() && roomSnap.data().bannedUsers) {
         setBannedUsers(roomSnap.data().bannedUsers);
       }
     };
-    
+
     checkModeratorStatus();
   }, [roomId]);
 
-  // Listen for messages
   useEffect(() => {
     const q = query(collection(db, `chatRooms/${roomId}/messages`), orderBy("timestamp", "asc"));
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
@@ -42,40 +39,35 @@ const ChatRoom = ({ route }) => {
     return () => unsubscribe();
   }, [roomId]);
 
-  // Check if current user is banned
   useEffect(() => {
     if (bannedUsers.includes(auth.currentUser.uid)) {
       Alert.alert("You have been banned from this chat room");
-      // Navigate back or show ban message
     }
   }, [bannedUsers]);
 
   const sendMessage = async () => {
     if (messageText.trim() === "") return;
 
-    // Fetch username from Firestore 'users' collection
     const userRef = doc(db, "users", auth.currentUser.uid);
     const userSnap = await getDoc(userRef);
 
     if (userSnap.exists()) {
-      const userName = userSnap.data().fullName || "Anonymous"; 
+      const userName = userSnap.data().fullName || "Anonymous";
 
-      // Check if user is banned
       if (bannedUsers.includes(auth.currentUser.uid)) {
         Alert.alert("You cannot send messages because you are banned");
         return;
       }
 
-      // Add message to Firestore
       await addDoc(collection(db, `chatRooms/${roomId}/messages`), {
         senderId: auth.currentUser.uid,
-        senderName: userName, // Use the fetched username
+        senderName: userName,
         text: messageText,
         timestamp: new Date(),
         isPinned: false,
       });
 
-      setMessageText(""); // Clear the input field after sending
+      setMessageText("");
     }
   };
 
@@ -148,6 +140,7 @@ const ChatRoom = ({ route }) => {
 
   const renderMessage = ({ item }) => {
     const isCurrentUser = item.senderId === auth.currentUser.uid;
+    const safeText = typeof item.text === "string" ? item.text : "Invalid message";
 
     return (
       <TouchableOpacity
@@ -163,10 +156,10 @@ const ChatRoom = ({ route }) => {
             <Text style={styles.pinIcon}>📌</Text>
           </View>
         )}
-        <Text style={styles.senderName}>{item.senderName}</Text> {/* Display senderName */}
-        <Text>{item.text}</Text>
+        <Text style={styles.senderName}>{item.senderName || "Unknown"}</Text>
+        <Text>{safeText}</Text>
         <Text style={styles.timestamp}>
-          {item.timestamp &&
+          {item.timestamp?.toDate?.() &&
             new Date(item.timestamp.toDate()).toLocaleTimeString([], {
               hour: "2-digit",
               minute: "2-digit",
@@ -176,7 +169,6 @@ const ChatRoom = ({ route }) => {
     );
   };
 
-  // Render pinned messages at the top
   const pinnedMessages = messages.filter((msg) => msg.isPinned);
 
   return (
@@ -194,7 +186,7 @@ const ChatRoom = ({ route }) => {
             <View key={message.id} style={styles.pinnedMessageCompact}>
               <Text style={styles.pinIcon}>📌</Text>
               <Text numberOfLines={1} style={styles.pinnedMessageText}>
-                {message.text}
+                {typeof message.text === "string" ? message.text : "Invalid message"}
               </Text>
             </View>
           ))}
