@@ -8,6 +8,7 @@ Commit is a mobile application designed to help individuals overcome porn addict
 - **Community Support**: Join chat rooms and find accountability partners.
 - **Progress Tracking**: Calendar-based activity logging and AI-generated reports.
 - **Resource Hub**: Access books, blogs, and activities to aid recovery.
+- **SOS & Meditation** : Mood-based calming audio & emergency contacts for instant support.
 
 ## Tech Stack
 - **React Native**: Frontend framework for cross-platform mobile development.
