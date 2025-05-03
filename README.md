@@ -1,4 +1,4 @@
-# Commit - AI-Powered Porn Addiction Recovery App
+# Commit - AI-Powered Pornography Addiction Recovery App
 
 Commit is a mobile application designed to help individuals overcome porn addiction through AI-driven insights, structured challenges, and community support. Built using React Native, Firebase, and Gemini AI, Commit empowers users with personalized guidance and a gamified recovery journey.
 
