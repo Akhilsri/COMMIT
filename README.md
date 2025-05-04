@@ -24,10 +24,6 @@ Commit is a mobile application designed to help individuals overcome porn addict
 
 (https://www.youtube.com/watch?v=BpsHVBQUMyk)
 
-## 🚀 Try the MVP
-
-[Click here to use the app](https://drive.google.com/file/d/1npoEnMO5SxbtLpqPcrLWog8_PBD0wpNc/view)
-
 ## Installation & Setup
 ### Prerequisites
 - Node.js & npm/yarn
