@@ -22,7 +22,7 @@ Commit is a mobile application designed to help individuals overcome porn addict
 
 ##[Watch the demo video]
 
-(https://www.youtube.com/watch?v=BpsHVBQUMyk)
+(https://drive.google.com/file/d/1SHqHVAF_5C6bViR1gxAqqFK2qxBT4Cge/view?usp=sharing)
 
 ## Installation & Setup
 ### Prerequisites
